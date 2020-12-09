@@ -10,6 +10,42 @@
     <link href="css/app.css" rel="stylesheet" />
     <link href="MeritCasting.styles.css" rel="stylesheet" />
     <link href="manifest.json" rel="manifest" />
+    <script type='text/javascript'>
+        var myInterval;
+
+        document.addEventListener("visibilitychange", () => {
+            console.log('we are hidden: ' + document.hidden)
+
+            if (document.hidden) {
+                startTimer();
+            } else {
+                stopTimer();
+            }
+        })
+
+        // Active
+        //window.addEventListener('focus', startTimer);
+
+        // Inactive
+        //window.addEventListener('blur', stopTimer);
+
+        function timerHandler() {
+            console.log('taking action while hidden');
+            location.reload();
+        }
+
+        // Start timer
+        function startTimer() {
+            //console.log('focus');
+            myInterval = window.setInterval(timerHandler, 5 * 60 * 1000);
+        }
+
+        // Stop timer
+        function stopTimer() {
+            window.clearInterval(myInterval);
+        }
+    </script>
+
     <script>
         window.navWithServiceWorker = (url) => {
             navigator.serviceWorker.ready.then(registration => {

@@ -75,7 +75,7 @@ self.addEventListener('notificationclose', (e) => {
 
     var url = notification.data.url;
 
-    console.log("notificationclise - notification click: " + url);
+    console.log("notificationclose - notification click: " + url);
 
     //clients.openWindow(url);
     //notification.close();
