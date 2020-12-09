@@ -34,24 +34,31 @@
 <br />
 
 @*
+    <div>
+        <input id="ShowNotifications" type="checkbox" checked="@ShowNotifications" @onchange="@OnShowNotificationsChanged" />
+        <label for="ShowNotifications">Show Notifications (recommended)</label>
+        <br />
+        <button class="btn btn-primary" hidden="@HideNotificationRequestButton" @onclick="OnAllowNotifications">Allow Notifications for Extras Opportunities</button>
+    </div>
+    <div>
+        <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
+        <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
+    </div>
+    <button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
+    <button class="btn btn-primary" @onclick="OnClearLocalStorage">Clear Local Storage</button>
+    <button class="btn btn-primary" @onclick="OnShowGoogleNotification">Show Google Notification</button>
+    <button class="btn btn-primary" @onclick="OnShowMeritCastingAppNotification">Merit Casting App Notification</button>
+    <button class="btn btn-primary" @onclick="OnClearLocalStorage">Clear Local Storage</button>
+    <button class="btn btn-primary" @onclick="OnStartPostPolling">Start Post Polling</button>
+    <button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
+*@
 <div>
     <input id="ShowNotifications" type="checkbox" checked="@ShowNotifications" @onchange="@OnShowNotificationsChanged" />
     <label for="ShowNotifications">Show Notifications (recommended)</label>
     <br />
     <button class="btn btn-primary" hidden="@HideNotificationRequestButton" @onclick="OnAllowNotifications">Allow Notifications for Extras Opportunities</button>
 </div>
-<div>
-    <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
-    <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
-</div>
-<button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
-<button class="btn btn-primary" @onclick="OnClearLocalStorage">Clear Local Storage</button>
-<button class="btn btn-primary" @onclick="OnShowGoogleNotification">Show Google Notification</button>
-<button class="btn btn-primary" @onclick="OnShowMeritCastingAppNotification">Merit Casting App Notification</button>
-<button class="btn btn-primary" @onclick="OnClearLocalStorage">Clear Local Storage</button>
-<button class="btn btn-primary" @onclick="OnStartPostPolling">Start Post Polling</button>
-<button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
-*@
+
 <div>
     <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
     <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
