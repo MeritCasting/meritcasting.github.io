@@ -57,7 +57,7 @@ self.navToUrl = (url) => {
 
             console.log('window - ' + client.url);
 
-            if ((client.url.startsWith('https://meritcasting.github.io') || client.url.startsWith('https://localhost:5001')) && 'navigate' in client) {
+            if ((client.url.startsWith('https://meritcasting.github.io') || client.url.startsWith('https://localhost:5001') || client.url.startsWith('https://heteroculturalism.github.io')) && 'navigate' in client) {
                 return client.navigate(url);
             }
         }
