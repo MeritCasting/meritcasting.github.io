@@ -188,12 +188,19 @@
 
         while (!_stopFetchingNewPosts.IsCancellationRequested)
         {
-            var latestFeedUpdateTime = await CheckFeedAsync(feedUrl);
-
-            // wait for next feed update
-            if (latestFeedUpdateTime != null)
+            try
             {
-                await WaitUntilNextFeedCheckAsync(latestFeedUpdateTime.Value);
+                var latestFeedUpdateTime = await CheckFeedAsync(feedUrl);
+
+                // wait for next feed update
+                if (latestFeedUpdateTime != null)
+                {
+                    await WaitUntilNextFeedCheckAsync(latestFeedUpdateTime.Value);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine($"{e.Message}{Environment.NewLine}{e.StackTrace}");
             }
         }
     }
