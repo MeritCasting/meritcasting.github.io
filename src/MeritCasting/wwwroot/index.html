@@ -9,6 +9,7 @@
     <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="MeritCasting.styles.css" rel="stylesheet" />
+    <link href="css/ShareButton.css" rel="stylesheet" />
     <link href="manifest.json" rel="manifest" />
     <script type='text/javascript'>
         var myInterval;
@@ -45,7 +46,6 @@
             window.clearInterval(myInterval);
         }
     </script>
-
     <script>
         window.navWithServiceWorker = (url) => {
             navigator.serviceWorker.ready.then(registration => {
@@ -89,7 +89,6 @@
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
     <script>navigator.serviceWorker.register('service-worker.js');</script>
-
     <script>
         window.getPermissionStatus = () => {
             if (!("Notification" in window)) {
@@ -98,6 +97,31 @@
             else {
                 return Notification.permission;
             }
+        }
+    </script>
+    <script>
+        window.setupShareButton = () => {
+            const shareButton = document.querySelector('.share-button');
+            const shareDialog = document.querySelector('.share-dialog');
+            const closeButton = document.querySelector('.close-button');
+
+            shareButton.addEventListener('click', event => {
+                if (navigator.share) {
+                    navigator.share({
+                        title: 'WebShare API Demo',
+                        url: 'https://codepen.io/ayoisaiah/pen/YbNazJ'
+                    }).then(() => {
+                        console.log('Thanks for sharing!');
+                    })
+                        .catch(console.error);
+                } else {
+                    shareDialog.classList.add('is-open');
+                }
+            });
+
+            closeButton.addEventListener('click', event => {
+                shareDialog.classList.remove('is-open');
+            });
         }
     </script>
 </body>
