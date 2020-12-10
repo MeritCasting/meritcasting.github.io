@@ -58,11 +58,11 @@
     <br />
     <button class="btn btn-primary" hidden="@HideNotificationRequestButton" @onclick="OnAllowNotifications">Allow Notifications for Extras Opportunities</button>
 </div>
-
 <div>
     <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
     <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
 </div>
+<button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
 
 <br />
     Unread Posts (newest at the top):
