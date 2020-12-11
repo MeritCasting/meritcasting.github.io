@@ -315,6 +315,7 @@
 
         // check if the app was installed via browser controls
         await RefreshAppInstallButtonAsync();
+        Console.WriteLine("show app install button: " + ShowAppInstallButton);
     }
 
     private Task RefreshAppInstallButtonAsync() => InvokeAsync(async () => ShowAppInstallButton = !await JS.InvokeAsync<bool>("isAppInstalled"));
