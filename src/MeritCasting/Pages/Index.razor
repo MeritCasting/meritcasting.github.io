@@ -29,6 +29,14 @@
 
 <br />
 <br />
+
+@if (ShowAppInstallButton)
+{
+    <button class="btn btn-primary" @onclick="OnInstallApp">Install App</button>
+    <br />
+    <br />
+}
+
     This app checks every 15 mintues for the latest extras opportunities.
 <br />
 <br />
@@ -52,19 +60,7 @@
     <button class="btn btn-primary" @onclick="OnStartPostPolling">Start Post Polling</button>
     <button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
 *@
-<div>
-    <input id="ShowNotifications" type="checkbox" checked="@ShowNotifications" @onchange="@OnShowNotificationsChanged" />
-    <label for="ShowNotifications">Show Notifications (recommended)</label>
-    <br />
-    <button class="btn btn-primary" hidden="@HideNotificationRequestButton" @onclick="OnAllowNotifications">Allow Notifications for Extras Opportunities</button>
-</div>
-<div>
-    <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
-    <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
-</div>
-<button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
 
-<br />
     Unread Posts (newest at the top):
 <ul>
     @if (_unreadPosts.Any())
@@ -119,7 +115,7 @@
     private const string AutogenerateNotificationsKey = "AutogenerateNotifications";
     private const string CastingPostQueryParameter = "castingPost";
 
-    private System.Timers.Timer _notificationPermissionTimer;
+    private System.Timers.Timer _browserInteractionMonitor;
     private List<Post> _unreadPosts = new List<Post>();
     private CancellationTokenSource _stopFetchingNewPosts;
 
@@ -130,13 +126,14 @@
     private string RedirectUrl { get; set; }
     private bool Redirect { get; set; }
     private string StatusMessage { get; set; } = "Loading...";
+    private bool ShowAppInstallButton { get; set; } = false;
 
     public void Dispose()
     {
-        var notificationPermissionTimer = _notificationPermissionTimer;
+        var notificationPermissionTimer = _browserInteractionMonitor;
         if (notificationPermissionTimer != null)
         {
-            notificationPermissionTimer.Elapsed -= OnCheckForNotificationPermission;
+            notificationPermissionTimer.Elapsed -= OnCheckForBrowserInteraction;
         }
 
         _stopFetchingNewPosts.Cancel();
@@ -162,6 +159,7 @@
 
         ShowNotifications = await localStorage.GetItemAsync<bool>(ShowNotificationsKey);
         AutogenerateNotifications = await localStorage.GetItemAsync<bool>(AutogenerateNotificationsKey);
+        await RefreshAppInstallButtonAsync();
 
         // display latest posts
         await RefreshUnreadPostsAsync(await Repo.GetUnreadPostsAsync());
@@ -177,9 +175,9 @@
         // monitor feeds
         _ = Task.WhenAll(feeds.Select(feed => MonitorFeedAsync(feed)));
 
-        _notificationPermissionTimer = new System.Timers.Timer(1 * 1000);
-        _notificationPermissionTimer.Elapsed += OnCheckForNotificationPermission;
-        _notificationPermissionTimer.Enabled = true;
+        _browserInteractionMonitor = new System.Timers.Timer(1 * 1000);
+        _browserInteractionMonitor.Elapsed += OnCheckForBrowserInteraction;
+        _browserInteractionMonitor.Enabled = true;
     }
 
     private async Task MonitorFeedAsync(string feedUrl)
@@ -284,6 +282,18 @@
         }
     }
 
+    private async Task OnInstallApp()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("installApp");
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine(e.Message);
+        }
+    }
+
     private async Task<bool> RemovePostWithUrlAsync(string url)
     {
         var unreadPosts = await Repo.GetUnreadPostsAsync();
@@ -298,10 +308,16 @@
         return unreadPostToRemove != null;
     }
 
-    private async void OnCheckForNotificationPermission(object sender, ElapsedEventArgs e)
+    private async void OnCheckForBrowserInteraction(object sender, ElapsedEventArgs e)
     {
+        // check if the notification permission changed via browser controls
         await RefreshHideNotificationRequestButtonAsync();
+
+        // check if the app was installed via browser controls
+        await RefreshAppInstallButtonAsync();
     }
+
+    private Task RefreshAppInstallButtonAsync() => InvokeAsync(async () => ShowAppInstallButton = !await JS.InvokeAsync<bool>("isAppInstalled"));
 
     private void OnStartPostPolling()
     {

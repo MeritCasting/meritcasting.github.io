@@ -30,12 +30,6 @@
             }
         })
 
-        // Active
-        //window.addEventListener('focus', startTimer);
-
-        // Inactive
-        //window.addEventListener('blur', stopTimer);
-
         function timerHandler() {
             console.log('taking action while hidden');
             location.reload();
@@ -43,7 +37,6 @@
 
         // Start timer
         function startTimer() {
-            //console.log('focus');
             myInterval = window.setInterval(timerHandler, 5 * 60 * 1000);
         }
 
@@ -88,11 +81,11 @@
 <body>
     <div id="app">Loading...</div>
 
-    <!--<div id="blazor-error-ui">
+    <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="" class="reload">Reload</a>
         <a class="dismiss">🗙</a>
-    </div>-->
+    </div>
     <script src="_framework/blazor.webassembly.js"></script>
     <script>navigator.serviceWorker.register('service-worker.js');</script>
     <script>
@@ -129,6 +122,46 @@
             closeButton.addEventListener('click', event => {
                 shareDialog.classList.remove('is-open');
             });
+        }
+    </script>
+    <script>
+        let deferredPrompt;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Stash the event so it can be triggered later.
+            deferredPrompt = e;
+        });
+
+        window.installApp = async () => {
+            deferredPrompt.prompt();
+
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                    deferredPrompt = null;
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+            });
+        }
+
+        window.isAppInstalled = async () => {
+            var appInstalled = false;
+
+            // if the 'beforeinstallprompt' event has never been set then it's because it was never raised due to the app already being installed
+            if (deferredPrompt == null) {
+                appInstalled = true;
+            } else {
+                const relatedApps = await navigator.getInstalledRelatedApps();
+                console.log('apps: ' + relatedApps + ', is null: ' + relatedApps == null);
+                relatedApps.forEach((app) => {
+                    console.log(app.id, app.platform, app.url);
+                });
+            }
+
+            return appInstalled;
         }
     </script>
 </body>
