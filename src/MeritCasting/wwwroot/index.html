@@ -148,20 +148,8 @@
         }
 
         window.isAppInstalled = async () => {
-            var appInstalled = false;
-
-            // if the 'beforeinstallprompt' event has never been set then it's because it was never raised due to the app already being installed
-            if (deferredPrompt == null) {
-                appInstalled = true;
-            } else {
-                const relatedApps = await navigator.getInstalledRelatedApps();
-                console.log('apps: ' + relatedApps + ', is null: ' + relatedApps == null);
-                relatedApps.forEach((app) => {
-                    console.log(app.id, app.platform, app.url);
-                });
-            }
-
-            return appInstalled;
+            // if the 'beforeinstallprompt' event is not  set then it's because either (1) it was never raised due to the app already being installed, or (2) it was set to null after being installed
+            return deferredPrompt == null;
         }
     </script>
 </body>
