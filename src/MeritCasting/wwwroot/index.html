@@ -148,6 +148,7 @@
         }
 
         window.isAppInstalled = async () => {
+            console.log(`app installed: ${deferredPrompt == null}`)
             // if the 'beforeinstallprompt' event is not  set then it's because either (1) it was never raised due to the app already being installed, or (2) it was set to null after being installed
             return deferredPrompt == null;
         }
