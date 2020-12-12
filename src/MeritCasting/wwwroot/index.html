@@ -126,31 +126,51 @@
     </script>
     <script>
         let deferredPrompt;
+        let appInstallAccepted;
 
         window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('beforeinstallprompt invoked');
             // Prevent the mini-infobar from appearing on mobile
             e.preventDefault();
             // Stash the event so it can be triggered later.
             deferredPrompt = e;
         });
 
+        window.addEventListener('appinstalled', (evt) => {
+            console.log('a2hs installed');
+            appInstallAccepted = true;
+        });
+
         window.installApp = async () => {
+            if (appInstallAccepted == true) {
+                return;
+            }
+
+            appInstallAccepted = null;
             deferredPrompt.prompt();
 
             deferredPrompt.userChoice.then((choiceResult) => {
                 if (choiceResult.outcome === 'accepted') {
                     console.log('User accepted the install prompt');
-                    deferredPrompt = null;
+                    appInstallAccepted = true;
                 } else {
                     console.log('User dismissed the install prompt');
+                    appInstallAccepted = false;
                 }
             });
         }
 
-        window.isAppInstalled = async () => {
-            console.log(`app installed: ${deferredPrompt == null}`)
-            // if the 'beforeinstallprompt' event is not  set then it's because either (1) it was never raised due to the app already being installed, or (2) it was set to null after being installed
-            return deferredPrompt == null;
+        window.isAppInstalled = () => {
+            console.log(`isAppInstalled: ${deferredPrompt == null || appInstallAccepted == true}`);
+
+            var result =
+                // if the 'beforeinstallprompt' event is not  set then it's because it was never raised due to the app already being installed
+                deferredPrompt == null
+
+                // user accepted app install via browser button or app install button
+                || appInstallAccepted == true;
+
+            return result;
         }
     </script>
 </body>
