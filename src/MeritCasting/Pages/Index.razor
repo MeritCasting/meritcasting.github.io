@@ -29,28 +29,38 @@
 
 <br />
 <br />
+
+@if (ShowAppInstallButton)
+{
+    <button class="btn btn-primary" @onclick="OnInstallApp">Install App</button>
+    <br />
+    <br />
+}
+
     This app checks every 15 mintues for the latest extras opportunities.
 <br />
 <br />
 
-@*<div>
-    <input id="ShowNotifications" type="checkbox" checked="@ShowNotifications" @onchange="@OnShowNotificationsChanged" />
-    <label for="ShowNotifications">Show Notifications (recommended)</label>
-    <br />
-    <button class="btn btn-primary" hidden="@HideNotificationRequestButton" @onclick="OnAllowNotifications">Allow Notifications for Extras Opportunities</button>
-</div>
-<div>
-    <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
-    <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
-</div>*@
-@*<button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
+@*
+    <div>
+        <input id="ShowNotifications" type="checkbox" checked="@ShowNotifications" @onchange="@OnShowNotificationsChanged" />
+        <label for="ShowNotifications">Show Notifications (recommended)</label>
+        <br />
+        <button class="btn btn-primary" hidden="@HideNotificationRequestButton" @onclick="OnAllowNotifications">Allow Notifications for Extras Opportunities</button>
+    </div>
+    <div>
+        <input id="AutoGenerateNotifications" type="checkbox" checked="@AutogenerateNotifications" @onchange="@OnAutogenerateNotificationsChanged" />
+        <label for="AutoGenerateNotifications">Autogenerate Notifications</label>
+    </div>
+    <button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
     <button class="btn btn-primary" @onclick="OnClearLocalStorage">Clear Local Storage</button>
     <button class="btn btn-primary" @onclick="OnShowGoogleNotification">Show Google Notification</button>
     <button class="btn btn-primary" @onclick="OnShowMeritCastingAppNotification">Merit Casting App Notification</button>
     <button class="btn btn-primary" @onclick="OnClearLocalStorage">Clear Local Storage</button>
     <button class="btn btn-primary" @onclick="OnStartPostPolling">Start Post Polling</button>
-    <button class="btn btn-primary" @onclick="OnFillList">Fill List</button>*@
-<br />
+    <button class="btn btn-primary" @onclick="OnFillList">Fill List</button>
+*@
+
     Unread Posts (newest at the top):
 <ul>
     @if (_unreadPosts.Any())
@@ -71,7 +81,7 @@
     }
     else
     {
-        <li>None</li>
+        <li>@StatusMessage</li>
     }
 </ul>
 
@@ -104,11 +114,8 @@
     private const string ShowNotificationsKey = "ShowNotifications";
     private const string AutogenerateNotificationsKey = "AutogenerateNotifications";
     private const string CastingPostQueryParameter = "castingPost";
-    private const string RootUrl = "https://meritcasting.github.io";
-    //private const string RootUrl = "https://localhost:5001";
 
-    private System.Timers.Timer[] _newPostsTimers;
-    private System.Timers.Timer _notificationPermissionTimer;
+    private System.Timers.Timer _browserInteractionMonitor;
     private List<Post> _unreadPosts = new List<Post>();
     private CancellationTokenSource _stopFetchingNewPosts;
 
@@ -118,16 +125,19 @@
     private string CastingPostUrl { get; set; }
     private string RedirectUrl { get; set; }
     private bool Redirect { get; set; }
+    private string StatusMessage { get; set; } = "Loading...";
+    private bool ShowAppInstallButton { get; set; } = false;
 
     public void Dispose()
     {
-        var notificationPermissionTimer = _notificationPermissionTimer;
+        var notificationPermissionTimer = _browserInteractionMonitor;
         if (notificationPermissionTimer != null)
         {
-            notificationPermissionTimer.Elapsed -= OnCheckForNotificationPermission;
+            notificationPermissionTimer.Elapsed -= OnCheckForBrowserInteraction;
         }
 
         _stopFetchingNewPosts.Cancel();
+        _stopFetchingNewPosts.Dispose();
     }
 
     protected override async Task OnInitializedAsync()
@@ -149,6 +159,7 @@
 
         ShowNotifications = await localStorage.GetItemAsync<bool>(ShowNotificationsKey);
         AutogenerateNotifications = await localStorage.GetItemAsync<bool>(AutogenerateNotificationsKey);
+        await RefreshAppInstallButtonAsync();
 
         // display latest posts
         await RefreshUnreadPostsAsync(await Repo.GetUnreadPostsAsync());
@@ -156,70 +167,79 @@
         _stopFetchingNewPosts = new CancellationTokenSource();
 
         var feeds = App.CastingFeeds;
-        _newPostsTimers = new System.Timers.Timer[feeds.Length];
 
-        for (var i = 0; i < feeds.Length; i++)
-        {
-            var feedUrl = feeds[i];
+        // update default status message after all feeds have been checked
+        await Task.WhenAll(feeds.Select(feed => CheckFeedAsync(feed)));
+        await InvokeAsync(() => StatusMessage = "None");
 
-            _newPostsTimers[i] = new System.Timers.Timer(1);
-            _newPostsTimers[i].Elapsed += async (s, e) =>
-            {
-                var timer = (System.Timers.Timer)s;
-                timer.Enabled = false;
+        // monitor feeds
+        _ = Task.WhenAll(feeds.Select(feed => MonitorFeedAsync(feed)));
 
-                await MonitorFeedAsync(feedUrl);
-            };
-            _newPostsTimers[i].Enabled = true;
-        }
-
-        _notificationPermissionTimer = new System.Timers.Timer(1 * 1000);
-        _notificationPermissionTimer.Elapsed += OnCheckForNotificationPermission;
-        _notificationPermissionTimer.Enabled = true;
+        _browserInteractionMonitor = new System.Timers.Timer(1 * 1000);
+        _browserInteractionMonitor.Elapsed += OnCheckForBrowserInteraction;
+        _browserInteractionMonitor.Enabled = true;
     }
 
     private async Task MonitorFeedAsync(string feedUrl)
     {
+        async Task WaitUntilNextFeedCheckAsync(DateTime lastFeedPublishTime) => await Task.Delay((int)(App.GetNextFeedCheckTime(lastFeedPublishTime) - DateTime.Now).TotalMilliseconds, _stopFetchingNewPosts.Token);
+
+        while (!_stopFetchingNewPosts.IsCancellationRequested)
+        {
+            try
+            {
+                var latestFeedUpdateTime = await CheckFeedAsync(feedUrl);
+
+                // wait for next feed update
+                if (latestFeedUpdateTime != null)
+                {
+                    await WaitUntilNextFeedCheckAsync(latestFeedUpdateTime.Value);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine($"{e.Message}{Environment.NewLine}{e.StackTrace}");
+            }
+        }
+    }
+
+    private async Task<DateTime?> CheckFeedAsync(string feedUrl)
+    {
+        DateTime? latestFeedUpdateTime = null;
+
         try
         {
-            async Task WaitUntilNextFeedCheckAsync(DateTime lastFeedPublishTime) => await Task.Delay((int)(App.GetNextFeedCheckTime(lastFeedPublishTime) - DateTime.Now).TotalMilliseconds, _stopFetchingNewPosts.Token);
+            Console.WriteLine($"Checking feed - {feedUrl}");
 
-            while (!_stopFetchingNewPosts.IsCancellationRequested)
+            var previousFeedUpdateTime = await Repo.GetLastFeedPublishTime(feedUrl);
+            var updatedFeedExpected = previousFeedUpdateTime != null && DateTime.Now > App.GetExpectedFeedUpdateTime(previousFeedUpdateTime.Value);
+
+            // get feed if we never checked before or we expect an updated feed
+            if (previousFeedUpdateTime == null || updatedFeedExpected)
             {
-                Console.WriteLine($"Checking feed - {feedUrl}");
+                var feed = await Repo.GetFeedAsync(feedUrl);
 
-                var lastFeedPublishTime = await Repo.GetLastFeedPublishTime(feedUrl);
-                var updatedFeedExpected = lastFeedPublishTime != null && DateTime.Now > App.GetExpectedFeedUpdateTime(lastFeedPublishTime.Value);
-                DateTime newFeedPublishTime;
+                latestFeedUpdateTime = App.GetPublishDate(feed);
 
-                // get feed if we never checked before or we expect an updated feed
-                if (lastFeedPublishTime == null || updatedFeedExpected)
+                if (updatedFeedExpected)
                 {
-                    var feed = await Repo.GetFeedAsync(feedUrl);
-
-                    newFeedPublishTime = App.GetPublishDate(feed);
-
-                    if (updatedFeedExpected)
-                    {
-                        await ProcessFeedAsync(feed, lastFeedPublishTime.Value);
-                    }
+                    await ProcessFeedAsync(feed, previousFeedUpdateTime.Value);
                 }
-                else
-                {
-                    newFeedPublishTime = lastFeedPublishTime.Value;
-                }
-
-                // save latest feed publish time
-                await Repo.SaveLastFeedPublishTime(feedUrl, newFeedPublishTime);
-
-                // wait for next feed check
-                await WaitUntilNextFeedCheckAsync(newFeedPublishTime);
             }
+            else
+            {
+                latestFeedUpdateTime = previousFeedUpdateTime.Value;
+            }
+
+            // save latest feed publish time
+            await Repo.SaveLastFeedPublishTime(feedUrl, latestFeedUpdateTime.Value);
         }
         catch (Exception e)
         {
-            Console.Error.WriteLine(e.Message);
+            Console.Error.WriteLine($"{e.Message}{Environment.NewLine}{e.StackTrace}");
         }
+
+        return latestFeedUpdateTime;
     }
 
     private async Task ProcessFeedAsync(SyndicationFeed feed, DateTime publishTimeOfLastProcessedFeed)
@@ -248,7 +268,7 @@
                 foreach (var unnotifiedPost in currentUnreadPosts.Where(unreadPost => !unreadPost.NotificationShown).OrderBy(unreadPost => unreadPost.PublishTime))
                 {
                     // show notification
-                    await Notification.ShowAsync(JS, new Notification("Merit Casting", $"New post from {unnotifiedPost.FeedName}!", $"{RootUrl}?{CastingPostQueryParameter}={unnotifiedPost.Url}"));
+                    await Notification.ShowAsync(JS, new Notification("Merit Casting", $"New post from {unnotifiedPost.FeedName}!", $"{NavManager.BaseUri}?{CastingPostQueryParameter}={unnotifiedPost.Url}"));
 
                     // save notification status
                     unnotifiedPost.NotificationShown = true;
@@ -259,6 +279,18 @@
 
             // display latest posts
             await RefreshUnreadPostsAsync(currentUnreadPosts);
+        }
+    }
+
+    private async Task OnInstallApp()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("installApp");
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine(e.Message);
         }
     }
 
@@ -276,10 +308,16 @@
         return unreadPostToRemove != null;
     }
 
-    private async void OnCheckForNotificationPermission(object sender, ElapsedEventArgs e)
+    private async void OnCheckForBrowserInteraction(object sender, ElapsedEventArgs e)
     {
+        // check if the notification permission changed via browser controls
         await RefreshHideNotificationRequestButtonAsync();
+
+        // check if the app was installed via browser controls
+        await RefreshAppInstallButtonAsync();
     }
+
+    private Task RefreshAppInstallButtonAsync() => InvokeAsync(async () => ShowAppInstallButton = !await JS.InvokeAsync<bool>("isAppInstalled"));
 
     private void OnStartPostPolling()
     {
@@ -393,8 +431,8 @@
     {
         if (await NotificationService.GetCurrentPermissionAsync(JS) == PermissionType.Granted)
         {
-            await Notification.ShowAsync(JS, new Notification("Merit Casting", "New post from 4 Star Casting!", $"{RootUrl}?castingPost=https://www.facebook.com/4StarCasting"));
-            await Notification.ShowAsync(JS, new Notification("Merit Casting", "New post from Chicago Fire Extras!", $"{RootUrl}?castingPost=https://www.facebook.com/ChicagoFireExtras"));
+            await Notification.ShowAsync(JS, new Notification("Merit Casting", "New post from 4 Star Casting!", $"{NavManager.BaseUri}?castingPost=https://www.facebook.com/4StarCasting"));
+            await Notification.ShowAsync(JS, new Notification("Merit Casting", "New post from Chicago Fire Extras!", $"{NavManager.BaseUri}?castingPost=https://www.facebook.com/ChicagoFireExtras"));
         }
     }
 
@@ -402,7 +440,7 @@
     {
         if (await NotificationService.GetCurrentPermissionAsync(JS) == PermissionType.Granted)
         {
-            await Notification.ShowAsync(JS, new Notification("Merit Casting", "PWA Notification", RootUrl));
+            await Notification.ShowAsync(JS, new Notification("Merit Casting", "PWA Notification", NavManager.BaseUri));
         }
     }
 
